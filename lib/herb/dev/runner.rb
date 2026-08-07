@@ -24,9 +24,10 @@ module Herb
       HIDE_CURSOR = "\e[?25l"
       SHOW_CURSOR = "\e[?25h"
 
-      def initialize(path: ".", cli: nil)
+      def initialize(path: ".", cli: nil, port: nil)
         @path = path
         @cli = cli
+        @port = port
       end
 
       def run
@@ -145,6 +146,8 @@ module Herb
       end
 
       def find_port
+        return requested_port if @port
+
         port = Herb::Dev::Server::DEFAULT_PORT
         port_owner = Herb::Dev::ServerEntry.find_by_port(port)
 
@@ -154,6 +157,23 @@ module Herb
         end
 
         port
+      end
+
+      # An explicitly requested port is never auto-incremented away from: pinning a
+      # port is only useful if it is the port you actually get, so a conflict is an
+      # error rather than something to silently work around.
+      def requested_port
+        owner = Herb::Dev::ServerEntry.find_by_port(@port)
+
+        if owner
+          abort "Port #{@port} is already used by the herb dev server for #{owner.project} (PID: #{owner.pid})."
+        end
+
+        unless Herb::Dev::Server.port_available?(@port)
+          abort "Port #{@port} is already in use by another process."
+        end
+
+        @port
       end
 
       def print_header(config, expanded_path)

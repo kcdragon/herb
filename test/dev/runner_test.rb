@@ -80,5 +80,42 @@ module Dev
 
       refute Herb::Dev::Runner.can_patch?(diff_result.operations)
     end
+
+    test "find_port uses the default port when nothing is registered" do
+      require_relative "../../lib/herb/dev/server"
+
+      runner = Herb::Dev::Runner.new(path: ".")
+
+      assert_equal Herb::Dev::Server::DEFAULT_PORT, runner.send(:find_port)
+    end
+
+    test "find_port uses an explicitly requested port" do
+      require_relative "../../lib/herb/dev/server"
+
+      runner = Herb::Dev::Runner.new(path: ".", port: 8791)
+
+      assert_equal 8791, runner.send(:find_port)
+    end
+
+    test "find_port aborts when the requested port belongs to another herb server" do
+      require_relative "../../lib/herb/dev/server"
+
+      entry = Herb::Dev::ServerEntry.new(pid: Process.pid, port: 8792, project: "/some/other/project")
+      entry.save
+
+      runner = Herb::Dev::Runner.new(path: ".", port: 8792)
+
+      original_stderr = $stderr
+      $stderr = StringIO.new
+
+      begin
+        assert_raises(SystemExit) { runner.send(:find_port) }
+        assert_includes $stderr.string, "8792"
+      ensure
+        $stderr = original_stderr
+      end
+    ensure
+      entry&.remove
+    end
   end
 end

@@ -5,10 +5,12 @@
 
 require "optparse"
 
+require_relative "dev/server_entry"
+
 class Herb::CLI
   include Herb::Colors
 
-  attr_accessor :json, :silent, :log_file, :no_timing, :local, :escape, :no_escape, :freeze, :debug, :tool, :strict, :analyze, :track_whitespace, :verbose, :isolate, :arena_stats, :leak_check, :action_view_helpers, :trim, :optimize, :file_timeout
+  attr_accessor :json, :silent, :log_file, :no_timing, :local, :escape, :no_escape, :freeze, :debug, :tool, :strict, :analyze, :track_whitespace, :verbose, :isolate, :arena_stats, :leak_check, :action_view_helpers, :trim, :optimize, :file_timeout, :port
 
   def initialize(args)
     @args = args
@@ -272,6 +274,10 @@ class Herb::CLI
 
       parser.on("--timeout SECONDS", Float, "Per-file timeout for parse + compile (for analyze command) (default: #{Herb::Project::DEFAULT_FILE_TIMEOUT})") do |seconds|
         self.file_timeout = seconds
+      end
+
+      parser.on("--port PORT", Integer, "Port for the dev server (for dev command) (default: #{Herb::Dev::ServerEntry::DEFAULT_PORT})") do |port|
+        self.port = port
       end
 
       parser.on("--log-file", "Enable log file generation") do
@@ -607,7 +613,7 @@ class Herb::CLI
 
   def dev_restart
     require_relative "dev/runner"
-    Herb::Dev::Runner.new(path: @file || ".").restart
+    Herb::Dev::Runner.new(path: @file || ".", port: dev_server_port).restart
   end
 
   def dev_status
@@ -617,7 +623,23 @@ class Herb::CLI
 
   def run_dev_server
     require_relative "dev/runner"
-    Herb::Dev::Runner.new(path: @file || ".").run
+    Herb::Dev::Runner.new(path: @file || ".", port: dev_server_port).run
+  end
+
+  def dev_server_port
+    return port if port
+
+    env_port = ENV.fetch("HERB_DEV_PORT", nil)
+    return nil if env_port.nil? || env_port.empty?
+
+    parsed = Integer(env_port, exception: false)
+
+    unless parsed
+      puts "Invalid HERB_DEV_PORT: '#{env_port}'. Expected a port number."
+      exit(1)
+    end
+
+    parsed
   end
 
   def diff_files

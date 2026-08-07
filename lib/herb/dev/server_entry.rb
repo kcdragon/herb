@@ -8,6 +8,7 @@ module Herb
     class ServerEntry
       SERVERS_DIR = File.expand_path("~/.herb/dev-servers").freeze
       REQUIRED_KEYS = ["pid", "port", "project", "started_at"].freeze
+      DEFAULT_PORT = 8592
 
       attr_reader :pid, :port, :project, :started_at
 
@@ -78,8 +79,26 @@ module Herb
           all.find { |entry| entry.port == port }
         end
 
+        # The runner registers `File.realpath` of the project root, but callers (e.g.
+        # framework integrations passing `Rails.root`) may reach the same directory
+        # through a symlink, so fall back to comparing resolved paths.
         def find_by_project(project_path)
-          all.find { |entry| entry.project == project_path }
+          return nil unless project_path
+
+          entries = all
+          entry = entries.find { |candidate| candidate.project == project_path }
+          return entry if entry
+
+          resolved = resolve_path(project_path)
+          resolved && entries.find { |candidate| resolve_path(candidate.project) == resolved }
+        end
+
+        def resolve_path(path)
+          return nil unless path
+
+          File.realpath(File.expand_path(path.to_s))
+        rescue StandardError
+          nil
         end
 
         def stop_all

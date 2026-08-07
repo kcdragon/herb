@@ -22,7 +22,7 @@ require_relative "server_entry"
 module Herb
   module Dev
     class Server
-      DEFAULT_PORT = 8592
+      DEFAULT_PORT = ServerEntry::DEFAULT_PORT
       HANDSHAKE_TIMEOUT = 5
 
       attr_reader :port, :project_path
